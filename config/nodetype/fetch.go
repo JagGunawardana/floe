@@ -86,6 +86,7 @@ func (g fetch) Execute(ws *Workspace, in Opts, output chan string) (int, Opts, e
 	t := time.NewTicker(300 * time.Millisecond)
 	defer t.Stop()
 
+	// start reporting updates
 Loop:
 	for {
 		select {
@@ -98,29 +99,53 @@ Loop:
 	// check for errors, emit it and bail
 	if err := resp.Err(); err != nil {
 		output <- fmt.Sprintf("Download failed: %v", err)
-		return 255, nil, err
+		return 255, nil, nil // don't consider this an err, just that it failed
 	}
 	output <- fmt.Sprintf("  %v / %v bytes (%.2f%%) in %v", resp.BytesComplete(), resp.Size, 100*resp.Progress(), time.Since(started))
 	output <- fmt.Sprintf("Download saved to %v", resp.Filename)
 
 	// if no location was given to link it to then link it to the root of the workspace
 	// this will be used to link to the file in the cache
-	if fop.Location == "" {
-		fop.Location = filepath.Join(wsSub, filepath.Base(resp.Filename))
-	} else if fop.Location[0] != filepath.Separator { // relative paths are relative to the workspace
-		filepath.Join(wsSub, fop.Location)
-	}
-	// if the location is a folder (ends in '/') and not a file name then add the filename
-	if fop.Location[len(fop.Location)-1] == filepath.Separator {
-		fop.Location = filepath.Join(fop.Location, filepath.Base(resp.Filename))
-	}
-	fop.Location = expandEnv(fop.Location, ws.BasePath)
-	os.Remove(fop.Location)
-	err = os.Link(resp.Filename, fop.Location)
+
+	println(filepath.Base(resp.Filename))
+	toLink := linkLocation(fop.Location, filepath.Base(resp.Filename))
+	toLink = expandEnv(toLink, ws.BasePath)
+	println(toLink)
+
+	// make sure it is truly not there
+	// but dont care if there is nothing to remove later failures
+	// will result if this fails when it should have succeeded
+	os.Remove(toLink)
+
+	// make sure the folder exists for the link
+	err = os.MkdirAll(filepath.Dir(toLink), 0700)
 	if err != nil {
 		return 255, nil, err
 	}
-	output <- fmt.Sprintf("Download linked to %v", fop.Location)
+
+	err = os.Link(resp.Filename, toLink)
+	if err != nil {
+		return 255, nil, err
+	}
+	output <- fmt.Sprintf("Download linked to %v", toLink)
 
 	return 0, nil, nil
+}
+
+func linkLocation(loc, name string) string {
+	// no location given so use download filename in root workspace
+	if loc == "" {
+		return filepath.Join(wsSub, name)
+	}
+	// if the location is not a file name (ends in '/')
+	// then the location is the location part plus the name
+	if loc[len(loc)-1] == filepath.Separator {
+		loc = filepath.Join(loc, name)
+	}
+	// relative paths are relative to the workspace so prepend with the
+	// substitution string for the workspace
+	if loc[0] != filepath.Separator {
+		loc = filepath.Join(wsSub, loc)
+	}
+	return loc
 }

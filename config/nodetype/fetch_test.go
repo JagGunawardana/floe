@@ -7,6 +7,42 @@ import (
 	"testing"
 )
 
+func TestLinkLocation(t *testing.T) {
+
+	fixs := []struct {
+		loc string
+		exp string
+	}{
+		{
+			loc: "",
+			exp: "{{ws}}/foo.txt",
+		},
+		{
+			loc: "/what/",
+			exp: "/what/foo.txt",
+		},
+		{
+			loc: "/what",
+			exp: "/what",
+		},
+		{
+			loc: "where/",
+			exp: "{{ws}}/where/foo.txt",
+		},
+		{
+			loc: "where.xx",
+			exp: "{{ws}}/where.xx",
+		},
+	}
+
+	for i, f := range fixs {
+		got := linkLocation(f.loc, "foo.txt")
+		if f.exp != got {
+			t.Errorf("%d) expected:<%s> got: <%s>", i, f.exp, got)
+		}
+	}
+}
+
 func TestFetch(t *testing.T) {
 	portCh := make(chan int)
 
@@ -20,6 +56,7 @@ func TestFetch(t *testing.T) {
 		url      string
 		algo     string
 		checksum string
+		anyError bool
 		expected []string
 	}{
 		{ // simple dl
@@ -47,11 +84,13 @@ func TestFetch(t *testing.T) {
 		{ // good dl bad checksum
 			url:      fmt.Sprintf("http://127.0.0.1:%d/get-file.txt", port),
 			algo:     "sha256",
-			checksum: "load-of bollox",
-			expected: []string{"Error", "hex", "checksum"},
+			checksum: "badfeeda", // hex compatible clearly crap checksum
+			anyError: true,
+			expected: []string{"Download failed", "checksum"},
 		},
 		{ // bad dl
 			url:      fmt.Sprintf("http://127.0.0.1:%d/wont_be_found", port),
+			anyError: true,
 			expected: fail,
 		},
 		{ // good external check
@@ -67,8 +106,9 @@ func TestFetch(t *testing.T) {
 			"url":           fx.url,
 			"checksum":      fx.checksum,
 			"checksum-algo": fx.algo,
+			"location":      "tmpdl/",
 		}
-		testNode(t, fmt.Sprintf("fetch test: %d", i), fetch{}, opts, fx.expected)
+		testNode(t, fmt.Sprintf("fetch test: %d", i), fetch{}, opts, fx.expected, fx.anyError)
 	}
 }
 

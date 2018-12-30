@@ -55,10 +55,10 @@ func TestEnvVars(t *testing.T) {
 		"shell": "export",
 		"env":   []string{"DAN=fart"},
 	}
-	testNode(t, "exe env vars", exec{}, opts, []string{`DAN="fart"`, `FLOEWS="`})
+	testNode(t, "exe env vars", exec{}, opts, []string{`DAN="fart"`, `FLOEWS="`}, false)
 }
 
-func testNode(t *testing.T, msg string, nt NodeType, opts Opts, expected []string) bool {
+func testNode(t *testing.T, msg string, nt NodeType, opts Opts, expected []string, expectAnyProbs bool) bool {
 	op := make(chan string)
 	var out []string
 	captured := make(chan bool)
@@ -69,23 +69,32 @@ func testNode(t *testing.T, msg string, nt NodeType, opts Opts, expected []strin
 		captured <- true
 	}()
 
-	tmp, err := ioutil.TempDir("", "floe-test")
+	tmpCache, err := ioutil.TempDir("", "floe-test-cache")
 	if err != nil {
-		t.Fatal("can't create tmp dir")
+		t.Fatal("can't create tmp dir", msg)
 	}
 	tmpBase, err := ioutil.TempDir("", "floe-test")
 	if err != nil {
-		t.Fatal("can't create tmp dir")
+		t.Fatal("can't create tmp dir", msg)
 	}
 
-	nt.Execute(&Workspace{
+	code, _, err := nt.Execute(&Workspace{
 		BasePath:   tmpBase,
-		FetchCache: tmp,
+		FetchCache: tmpCache,
 	}, opts, op)
 
 	close(op)
 
 	<-captured
+
+	if !expectAnyProbs {
+		if err != nil {
+			t.Fatal("got err", msg, err)
+		}
+		if code != 0 {
+			t.Error("got none zero exit code", msg, code)
+		}
+	}
 
 	prob := false
 	for _, x := range expected {
@@ -102,10 +111,10 @@ func testNode(t *testing.T, msg string, nt NodeType, opts Opts, expected []strin
 		}
 	}
 	// output the output if there was a problem
-	t.Log("cache is at:", tmp)
-	for _, o := range out {
-		t.Log(o)
-	}
+	// t.Log("cache is at:", tmpCache)
+	// for _, o := range out {
+	// 	t.Log(o)
+	// }
 
 	return prob
 }

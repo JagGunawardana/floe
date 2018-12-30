@@ -1,5 +1,6 @@
-Floe
+Floe 
 ====
+[![Build Status](https://travis-ci.org/floeit/floe.svg?branch=master)](https://travis-ci.org/floeit/floe)
 
 A workflow engine, well suited to long running business process execution, for example:
 
@@ -7,24 +8,24 @@ A workflow engine, well suited to long running business process execution, for e
 * Continuous integration.
 * Customer onboarding.
 
-Quick Start
------------
-Download or build from scratch `floe` executable.
+Demo
+----
 
-Start two host processes:
+There is a demo server that checks out and builds the floe code (and the floe docs)...
 
-1. floe -tags=linux,go,couch -admin=123456 -host_name=h1 -pub_bind=127.0.0.1:8080
+[DEMO](https://demo.floe.it/app/flows/floe) (enter any username and password - it is not checked)
 
-2. floe -tags=linux,go,couch -admin=123456 -host_name=h2 -pub_bind=127.0.0.1:8090
+User Docs
+---------
+[Documentation for using floe.](http://www.floe.it/) - including quick start.
 
-These commands default to reading in a `default.yml`
+Building
+--------
+1. Clone the repo
+2. `go install ./...`
+3. `go test ./...` (optional `-tags=integration_test`)
 
-web 
----
-
-http://localhost:8080/app/dash
-
-
+ 
 Floe Terminology 
 ----------------
 Flows are coordinated by nodes issuing events to which other nodes `listen`.
@@ -76,109 +77,18 @@ All of this is dealt with in the `Hub` the files are divided into three:
 
 Config
 ------
-
-### Common Config
-
-All config has a Common section which has the following top level config items:
-
-* `hosts`       - []string - all other floe Hosts
-* `base-url`    - string - the api base url,  in case hosting on a sub domain.
-* `config-path` - string - is a path to the config which can be a path to a file in a git repo e.g. git@github.com:floeit/floe.git/build/FLOE.yaml
-* `store-type`  - string - define which type of store to use - memory, local, ec2
-* `key-file`    - the private key to use with git. e.g. 'git-key: "/home/ubuntu/.ssh/id_floedemo_rsa"' if empty then the system installed key is used.
-
-### Flow Config
-
-**A note on the workspace var**
-Many field values will expand to include the workspace.  Any `{{ws}}` will be replaced by the absolute workspace path.
-Task fields that start `./` (and are not `./...`) will also be replaced by the absolute workspace path, as will any value `.` on its own.
-
-A flow has the following top level config items:
-
-* `id` - string - url friendly ID - computed from the name if not given explicitly.
-* `ver`- int    - Flow version, together with an ID form a global compound unique key.
-* `name` - string - human friendly name for the flow - will show up in web interface.
-* `reuse-space`	- bool - If true then will use the single workspace and will mutex with other instances of this Flow on the same host.
-* `host-tags` - ([]string) - Tags that must match the tags on the host, useful for assigning specific flows to specific hosts.
-* `resource-tags` - ([]string) - Tags that represent a set of shared resources that should not be accessed by two or more runs. So if any flow has an active run on a host then no other flow can launch a run if the flow has any tags matching the one running.
-* `env`     - ([]string) - In the form of key=value environment variable to be set in the context of the command being executed, can include `{{ws}}` to expand to full absolute path - `.` at the start will be treated like `{{ws}}`.
-
-* `flow-file` - string - the reference to a file that can be loaded as the pending run is generated, this file will override the config of the floe - so can be used like a jenkinsfile, three types of reference can be used...
-    * `file` - load it from the local file system. e.g. `floes/floe.yaml`
-    * `git` - do the shallowest clone of the repo specified and grab the content e.g. `git@github.com:floeit/floe.git/build/FLOE.yaml` in this case if the opts contain a ref then the ref (git ref - e.g. tag, branch etc.) will be used
-    *  `fetch` - Fetch a file via http(s) e.g. `https://raw.githubusercontent.com/floeit/floe/redesign/confog.yaml`
-
-### Triggers
-
-Triggers are the things that start a flow off there are a few types of trigger.
-
-* `data` - Where a web request pushing data to the server may trigger a flow - for example the web interface uses this, to explicitly launch a run.
-* `timer` - A flow can be triggered periodically - as a timer does not contain any repo version info this can only include git 
-
-### Tasks
-
-All tasks have the following top level fields:
-
-* `id`     - (string) A url friendly identity for this node, it has to be unique within a flow. If an id is not give then the name will be used to generate the ID.
-* `name`   - (string) A human friendly name to display in the web interface. If a name is not given then one will be generated from the id (either a `name` or `id` must be given).
-* `class`  - There are two task classes:  
-    * `task`  - A standard task does something - this is the default, and does not need to be in the config explicitly.
-    * `merge` - A merge task waits for all or one of a list of events.
-* `listen` - (string) The event tag that will trigger this 
-
-Standard tasks (class `task`) have the following fields.
-
-* `ignore-fail` - Only ever send an event tag containing the `good`postfix, even if the node failed. Can't be used in conjunction with `use-status`.
-* `type`        - The specific type of task to execute.
-    * `end`          - Special task that when reached positively indicates the flow ended.
-    * `data`         - Accepts data from the web API, and is used to create web forms.
-    * `timer`        - Waits a certain amount of time before firing its success event.
-    * `exec`         - The main work horse, execute commands directly or via invoking a shell.
-    * `fetch`        - Downloads a file over http(s).
-    * `git-checkout` - Checkout a git repo
-* `good`        - ([]int) The array of exit status codes considered a success. Default is `0` (an array of this one value)
-* `use-status`  - (bool) If true then rather emit an event on task end containing the postfix `good` or `bad` use the actual exit code.
-* `opts`        - (map) The variable map of options as needed by each `type`.
-
-Merge tasks (class `merge`) have the following fields.
-
-* `wait` - ([]string) - Array of event tags to wait for.
-* `type` - The type of merge.
-    * `all` - Wait for all events in the wait array.
-    * `any` - Wait for any of the events in the wait array.
-
-### Task Types
-
-The specific task types and associated options. 
-
-#### exec
-
-The most common type of task node - executes a command, e.g. runs a mke command or a bash script.
-
-Options:
-
-* `cmd`     - Use this if you are running an executable that only depends on the binary
-* `shell`   - Use this if you are running something that requires the shell, e.g. bash scripts.
-* `args`    - An array of command line arguments - for simple arguments these can be included space delimited in the `cmd` or `shell` lines, if there are quote enclosed arguments then use this args array.
-* `sub-dir` - The sub directory (relative to the run workspace) to execute the command in.
-* `env`     - ([]string) - In the form of key=value environment variable to be set in the context of the command being executed.
-
-#### fetch
-
-Downloads and caches a file from the web.
-
-Options:
-
-* `url`           - The URL to get the file from.
-* `checksum`      - The checksum to validate the file.
-* `checksum-algo` - What algorithm to use to compute the checksum `sha256`, `sha1` or `md5` are supported.
-* `location`      - Where to link the file once downloaded - can use `{{ws}}` substitution. Relative paths will be relative to the workspace folder for the run. If no location is given it will be linked to the root of the workspace. If the location ends in `/` (or `\` on some systems) then the file will be named as the download name, but moved to the location specified.
+It is best to read the [Config file Documentation.](http://www.floe.it/#config)
 
 Development
 -----------
 The web assets are shipped in the binary as 'bindata' so if you change the web stuff then run `go generate ./server` to regenerate the `bindata.go`
 
-During dev you can use the `webapp` folder directly by passing in `-dev=true`
+To run a `Host` ...
+
+`floe -tags=linux,go,couch -admin=123456 -host_name=h1 -pub_bind=127.0.0.1:8080`
+
+During dev you can use the `webapp` folder directly by passing in `-dev=true` to the floe command.
+
 
 TLS Testing
 -----------
@@ -202,9 +112,7 @@ Working on a new flow outside of the development environment, for example if you
 ### 1. From a local folder.
 Launch the floe you have downloaded or built but point it at a config and root folder somewhere else. 
 
-`floe -tags=linux,go,couch -admin=123456 -host_name=h1 -conf=/somepath/testfloe/config.yml -root=/somepath/testfloe/testfloe/ws -pub_bind=127.0.0.1:8080`
-
-TODO more info
+`floe -tags=linux,go,couch -admin=123456 -host_name=h1 -conf=/somepath/testfloe/config.yml -pub_bind=127.0.0.1:8080`
 
 Deploying to AWS
 ----------------
@@ -212,9 +120,12 @@ There is an image available that can bootstrap a floe instance `ami-006defacf6ec
 
 Floe can bind its web handlers to the public and private ip's and run TLS on each independently. For instance if you are not terminating your inbound requests on a TLS enabled balancer or reverse proxy then you can bind floe to the external IP and serve TLS on that, whilst serving plain http for the floe to floe cluster.
 
-Running floe directly on the vm means you dont benefit from the fully hermetic approach of using an ephemeral container, but floe can be used to create hermetic builds with some care and set up; the flow itself can download and install tooling into the workspace and use only these tools, of course this has an overhead, and you may want to make the tools you need to download available in S3, however many tools are well cached by amazon.
+Running floe directly on the vm means you dont benefit from the fully hermetic approach of using an ephemeral container, but floe can be used to create hermetic builds with some care and set up; the flow itself can download and install tooling into the workspace and use only these tools, of course this has an overhead, and you may want to make the tools you need to download available in S3, however many tools are well cached by amazon (Golang for example).
 
-Whist floe attempts to only set env vars within the scope of its sub processes, there is nothing in particular to stop you writing scripts or programs that alter the global environment. Similarly all file activity is generally expected to be within the run workspace, but you could alter global shared storage in your flow. Given all that you may still be happy that you ave built a well controlled image that already has the tools at known versions, and you are happy that your builds are repeatable and that no action of previous builds are mutating any installed components or otherwise altering the environment, and are therefore effectively safe enough.
+### Environment - WARNING
+Whist floe attempts to only set env vars within the scope of its sub processes, there is nothing in particular to stop you writing scripts or programs that alter the global environment. Similarly all file activity is generally expected to be within the run workspace, but you could alter global shared storage in your flow. 
+
+Given all that - you may still be happy that you ave built a well controlled image that already has the tools at known versions, and you are happy that your builds are repeatable and that no action of previous builds are mutating any installed components or otherwise altering the environment, and are therefore effectively safe enough.
 
 There is an example `start.sh` script with typical command line options. You can use this as an example of how to launch `floe` in your own vm.
 

@@ -7,7 +7,7 @@ import (
 )
 
 func TestGitLs(t *testing.T) {
-	output, ok := Ls("git@github.com:floeit/floe.git", "", "", "")
+	output, _, ok := Ls("git@github.com:floeit/floe.git", "", "", "")
 	if !ok {
 		t.Error("git ls failed")
 	}
@@ -18,7 +18,7 @@ func TestGitLs(t *testing.T) {
 		t.Log(k, v)
 	}
 
-	output, ok = Ls("git@github.com:floeit/floe.git", "master", "", "")
+	output, _, ok = Ls("git@github.com:floeit/floe.git", "master", "", "")
 	if !ok {
 		t.Error("git ls failed")
 	}

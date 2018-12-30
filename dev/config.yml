@@ -1,7 +1,7 @@
 common:
     base-url: "/build/api" 
     store-type: local
-    workspace-root: /home/ubuntu/floews
+    # workspace-root: /home/ubuntu/floews
     git-key: "/home/ubuntu/.ssh/id_floedemo_rsa"
     hosts:
         - http://127.0.0.1:8080      # ourself only
@@ -39,5 +39,16 @@ flows:
             
       flow-file: git@github.com:floeit/floe.git/dev/floe.yml   # get the actual flow from this file
 
+    - id: danmux
+      name: Docs danmux.com
+      ver: 1
       
-    
+      triggers:
+        - name: Commits
+          type: poll-git
+          opts:
+            period: 10                                            # check every 10 seconds
+            url: git@github.com:danmux/danmux-hugo.git                   # the repo to check
+            refs: "refs/heads/*"                                  # the refs pattern to match
+            
+      flow-file: git@github.com:danmux/danmux-hugo.git/floe.yml   # get the actual flow from this file

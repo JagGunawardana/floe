@@ -2,6 +2,7 @@ package hub
 
 import (
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -125,9 +126,11 @@ func (r *repoPoller) timer(q *event.Queue, tim *timer) {
 	}
 
 	log.Debugf("<%s> - checking repo <%s> for changes matching <%s>", tim.flow, r.url, r.refs)
-	new, ok := git.Ls(r.url, r.refs, r.exclude, r.gitKey)
+	new, output, ok := git.Ls(r.url, r.refs, r.exclude, r.gitKey)
 	if !ok {
 		log.Errorf("<%s> - could not get new refs: %s", tim.flow, err)
+		log.Errorf(strings.Join(output, "\n"))
+		return
 	}
 
 	err = r.saveRefs(tim.flow.ID, *new)

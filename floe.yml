@@ -1,7 +1,6 @@
 id: danmux
 env:
   - GOPATH={{ws}}
-  # - PATH=$PATH:{{ws}}/bin
 ver: 1
 
 tasks: 

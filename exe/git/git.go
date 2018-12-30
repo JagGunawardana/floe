@@ -9,12 +9,6 @@ import (
 	"github.com/floeit/floe/exe"
 )
 
-type logger interface {
-	Info(...interface{})
-	Debug(...interface{})
-	Error(...interface{})
-}
-
 // Ref contains details of a git reference
 type Ref struct {
 	Name   string
@@ -30,7 +24,7 @@ type Hashes struct {
 }
 
 // Ls list a remote repo
-func Ls(url, pattern, exclude, gitKey string) (*Hashes, bool) {
+func Ls(url, pattern, exclude, gitKey string) (*Hashes, []string, bool) {
 	if pattern == "" {
 		pattern = "refs/*"
 	}
@@ -42,15 +36,15 @@ func Ls(url, pattern, exclude, gitKey string) (*Hashes, bool) {
 
 	gitOut, status := exe.RunOutput(env, "", "git", "ls-remote", "--refs", url, pattern)
 	if status != 0 {
-		return nil, false
+		return nil, gitOut, false
 	}
+
 	latestHash := &Hashes{
 		RepoURL: url,
 	}
-
 	// drop the command and blank line
 	parseGitResponse(gitOut[2:], latestHash, exclude)
-	return latestHash, true
+	return latestHash, gitOut, true
 }
 
 func parseGitResponse(lines []string, hashes *Hashes, exclude string) {

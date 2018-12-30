@@ -1,0 +1,162 @@
+[common]
+base-url = "/build/api"
+store-type = "local"
+hosts = [
+  "http://127.0.0.1:8080"
+]
+
+[[flows]]
+id = "build-project"
+name = "Build Project"
+ver = 1.0
+reuse-space = false
+resource-tags = [
+  "couchbase",
+  "nic"
+]
+host-tags = [
+  "linux",
+  "go",
+  "couch"
+]
+
+  [[flows.triggers]]
+  name = "push"
+  type = "git-push"
+
+    [flows.triggers.opts]
+    url = "blah.blah"
+
+  [[flows.triggers]]
+  name = "start"
+  type = "data"
+
+    [flows.triggers.opts]
+
+      [flows.triggers.opts.form]
+      title = "Start"
+
+        [[flows.triggers.opts.form.fields]]
+        id = "ref"
+        prompt = "Ref (branch or hash)"
+        type = "text"
+        value = "master"
+
+        [[flows.triggers.opts.form.fields]]
+        id = "from-ref"
+        prompt = "Ref to merge (branch or hash)"
+        type = "text"
+
+  [[flows.tasks]]
+  name = "Checkout"
+  type = "git-merge"
+  listen = "trigger.good"
+  good = [
+    0.0
+  ]
+  ignore-fail = false
+
+    [flows.tasks.opts]
+    sub-dir = "src/github.com/floeit"
+    url = "git@github.com:floeit/floe.git"
+
+  [[flows.tasks]]
+  name = "Echo"
+  type = "exec"
+  listen = "task.checkout.good"
+
+    [flows.tasks.opts]
+    cmd = "echo"
+    args = [
+      "dan is a goon"
+    ]
+
+  [[flows.tasks]]
+  name = "Build"
+  type = "exec"
+  listen = "task.checkout.good"
+
+    [flows.tasks.opts]
+    cmd = "ls"
+    args = [
+      "-lrt",
+      "/"
+    ]
+
+  [[flows.tasks]]
+  name = "Test"
+  type = "exec"
+  listen = "task.build.good"
+
+    [flows.tasks.opts]
+    shell = "sleep 10"
+
+  [[flows.tasks]]
+  name = "Sign Off"
+  type = "data"
+  listen = "task.build.good"
+
+    [flows.tasks.opts]
+
+      [flows.tasks.opts.form]
+      title = "Sign off Manual Testing"
+
+        [[flows.tasks.opts.form.fields]]
+        id = "tests_passed"
+        prompt = "Did the manual testing pass?"
+        type = "bool"
+
+        [[flows.tasks.opts.form.fields]]
+        id = "to_hash"
+        prompt = "To Branch (or hash)"
+        type = "string"
+
+  [[flows.tasks]]
+  name = "Wait For Tests and Sign Off"
+  class = "merge"
+  id = "signed"
+  type = "all"
+  wait = [
+    "task.echo.good",
+    "task.test.good",
+    "task.sign-off.good"
+  ]
+
+  [[flows.tasks]]
+  name = "Final Task"
+  type = "exec"
+  listen = "merge.signed.good"
+
+    [flows.tasks.opts]
+    cmd = "ls"
+
+  [[flows.tasks]]
+  name = "complete"
+  listen = "task.final-task.good"
+  type = "end"
+
+[[flows]]
+id = "danmux"
+ver = 1.0
+flow-file = "floe.yml"
+
+  [[flows.triggers]]
+  name = "start"
+  type = "data"
+
+    [flows.triggers.opts]
+
+      [flows.triggers.opts.form]
+      title = "Start"
+
+        [[flows.triggers.opts.form.fields]]
+        id = "ref"
+        prompt = "Git Ref (branch or hash etc)"
+        type = "text"
+
+  [[flows.triggers]]
+  name = "Every 5 Minutes"
+  type = "timer"
+
+    [flows.triggers.opts]
+    period = 300.0

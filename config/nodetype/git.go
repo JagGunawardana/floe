@@ -11,7 +11,7 @@ type gitOpts struct {
 	Branch     string `json:"branch"`      // what to checkout
 	Hash       string `json:"hash"`        // the exact hash for repeatability
 	FromBranch string `json:"from-branch"` // what to checkout and rebase onto Ref
-	KeyFile    string `json:"key-file"`    // what key file to use
+	GitKey     string `json:"git-key"`     // what key file to use
 }
 
 // gitMerge is an executable node that checks out a hash and then
@@ -73,8 +73,8 @@ func (g gitCheckout) Execute(ws *Workspace, in Opts, output chan string) (int, O
 		return 0, nil, nil
 	}
 	var env []string
-	if gop.KeyFile != "" {
-		env = []string{fmt.Sprintf(`GIT_SSH_COMMAND=ssh -i %s`, gop.KeyFile)}
+	if gop.GitKey != "" {
+		env = []string{fmt.Sprintf(`GIT_SSH_COMMAND=ssh -i %s`, gop.GitKey)}
 	}
 	// git clone --branch mytag0.1 --depth 1 https://example.com/my/repo.git
 	args := []string{"clone", "--branch", gop.Branch, "--depth", "1", gop.URL}

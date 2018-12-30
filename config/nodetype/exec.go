@@ -10,22 +10,10 @@ import (
 	"github.com/floeit/floe/exe"
 )
 
-var log logger
-
-func SetPkgLogger(l logger) {
-	log = l
-}
-
 const (
 	shortRel = "./"
 	wsSub    = "{{ws}}"
 )
-
-type logger interface {
-	Info(...interface{})
-	Debug(...interface{})
-	Error(...interface{})
-}
 
 // exec node executes an external task
 type exec struct {
@@ -34,6 +22,7 @@ type exec struct {
 	Args   []string
 	SubDir string `json:"sub-dir"`
 	Env    []string
+	GitKey string `json:"git-key"`
 }
 
 func (e exec) Match(ol, or Opts) bool {
@@ -75,18 +64,24 @@ func (e exec) Execute(ws *Workspace, in Opts, output chan string) (int, Opts, er
 	}
 
 	// expand the workspace var and any env vars for the vars, command and args
-	e.Env = expandEnvOpts(e.Env, ws.BasePath)
+	env := expandEnvOpts(e.Env, ws.BasePath)
 	for i, arg := range args {
 		args[i] = expandEnv(arg, ws.BasePath)
 	}
+	// add the full workspace path
 	cmd = expandWs(cmd, ws.BasePath)
 	// use any cmd on the new env path, rather than current path
-	cmd = useEnvPathCmd(cmd, e.Env)
-
+	cmd = useEnvPathCmd(cmd, env)
 	// add in the env var path to the workspace so scripts can use it
-	e.Env = append(e.Env, "FLOEWS="+ws.BasePath)
+	env = append(env, "FLOEWS="+ws.BasePath)
 
-	status := doRun(filepath.Join(ws.BasePath, e.SubDir), e.Env, output, cmd, args...)
+	// special case of if the exe command includes any git stuff
+	// then add in any kit key option
+	if e.GitKey != "" {
+		env = append(env, fmt.Sprintf(`GIT_SSH_COMMAND=ssh -i %s`, e.GitKey))
+	}
+
+	status := doRun(filepath.Join(ws.BasePath, e.SubDir), env, output, cmd, args...)
 
 	return status, Opts{}, nil
 }
